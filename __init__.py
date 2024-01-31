@@ -1,0 +1,1 @@
+from .autopinyin import AutoPinyin
