@@ -5,6 +5,8 @@ import unicodedata
 import time
 import re
 
+from utils import split_string, chinese_punctuation_translate
+
 
 class InputIndicatorNotFoundError(Exception):
     """Raised when the input indicator is not found"""
@@ -21,7 +23,7 @@ class CandidatePanelNotFoundError(Exception):
 
 class AutoPinyin(object):
 
-    def __init__(self, ui_respond_time=0.08, type_interval=0.001) -> None:
+    def __init__(self, ui_respond_time=0.06, type_interval=0.001, split_length=5) -> None:
         super().__init__()
         
         self.input_indicator = None
@@ -33,6 +35,8 @@ class AutoPinyin(object):
 
         self.ui_respond_time = ui_respond_time
         self.type_interval = type_interval
+
+        self.split_length = split_length
     
 
     def find_input_indicator(self) -> None:
@@ -102,6 +106,7 @@ class AutoPinyin(object):
     
 
     def auto_pinyin_input(self, characters: str, wait_time=0) -> None:
+        """自动输入（只能是汉字），输入完成后自动按下候选项数字键"""
         time.sleep(wait_time)
 
         self.switch_to_chinese()
@@ -128,14 +133,15 @@ class AutoPinyin(object):
         
         candidates = self.candidate_panel.GetChildren()
         candidate_num = 0
-        prev_name = ''
         remaining_characters = characters
+
+        print(f'after input, candidates: {[candidate.Name for candidate in candidates]}')
 
         while remaining_characters != '':
 
             hit = False
 
-            while candidates != None and candidates[candidate_num].Name == prev_name:
+            while self.previous_page_button.IsEnabled:
                 pass
 
             while not hit:
@@ -146,12 +152,45 @@ class AutoPinyin(object):
                     candidate_num += 1
                     if remaining_characters.startswith(candidate.Name):
                         hit = True
-                        prev_name = candidate.Name
                         remaining_characters = remaining_characters[len(candidate.Name):]
+                        print(f'hit candidate #{candidate_num}: {candidate.Name}, remaining characters: {remaining_characters}')
+                        print(f'candidates: {[candidate.Name for candidate in candidates]}')
                         pyautogui.press(str(candidate_num))
                         time.sleep(self.ui_respond_time)
                         break
                 
                 if not hit:
-                    pyautogui.press(']')
-                    time.sleep(self.ui_respond_time)
+                    if self.next_page_button.IsEnabled:
+                        pyautogui.press(']')
+                        time.sleep(self.ui_respond_time)
+                    else:
+                        while self.previous_page_button.IsEnabled:
+                            pyautogui.press('[')
+
+
+    def auto_input(self, characters: str, wait_time=0) -> None:
+        """自动输入（任意字符），输入完成后自动按下候选项数字键"""
+        time.sleep(wait_time)
+
+        group = split_string(characters)
+
+        for item in group:
+            if item['type'] == '汉字':
+                self.switch_to_chinese()
+                str = item['string']
+                # Split str into substrings of length self.split_length
+                substrings = [str[i:i+self.split_length] for i in range(0, len(str), self.split_length)]
+                print(f'substrings: {substrings}')
+                for substring in substrings:
+                    self.auto_pinyin_input(substring)
+            
+            elif item['type'] == '中文标点':
+                self.switch_to_chinese()
+                str = item['string']
+                str = chinese_punctuation_translate(str)
+                pyautogui.typewrite(str)
+            
+            else:
+                self.switch_to_english()
+                pyautogui.typewrite(item['string'])
+        
