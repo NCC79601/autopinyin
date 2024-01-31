@@ -5,7 +5,7 @@ import unicodedata
 import time
 import re
 
-from utils import split_string, chinese_punctuation_translate
+from .utils import split_string, chinese_punctuation_translate
 
 
 class InputIndicatorNotFoundError(Exception):
