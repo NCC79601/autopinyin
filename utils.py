@@ -14,7 +14,7 @@ def char_type(char):
     elif char in supported_cn_punctuation:
         return '中文标点'
     elif '\u0000' <= char <= '\u007f':
-        return 'ASCII'
+        return '换行' if char == '\n' else 'ASCII'
     else:
         return '其他'
 

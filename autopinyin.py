@@ -22,6 +22,38 @@ class CandidatePanelNotFoundError(Exception):
     pass
 
 
+import win32api
+import win32gui
+from win32con import WM_INPUTLANGCHANGEREQUEST
+
+def change_language(lang="EN"):
+    """
+    切换语言
+    :param lang: EN–English; ZH–Chinese
+    :return: bool
+    """
+    LANG = {
+        "ZH": 0x0804,
+        "EN": 0x0409
+    }
+    hwnd = win32gui.GetForegroundWindow()
+    language = LANG[lang]
+    result = win32api.SendMessage(
+        hwnd,
+        WM_INPUTLANGCHANGEREQUEST,
+        0,
+        language
+    )
+    if not result:
+        return True
+    
+
+def press_shift(press_time=0.2):
+    pyautogui.keyDown('shift')
+    time.sleep(press_time)
+    pyautogui.keyUp('shift')
+
+
 class AutoPinyin(object):
 
     def __init__(self, ui_respond_time=0.06, type_interval=0.001, split_length=5) -> None:
@@ -82,31 +114,26 @@ class AutoPinyin(object):
         self.find_input_indicator()
 
         # 切换到微软拼音
-        if re.search('英语\(', self.input_indicator.Name):
-            # Windows + 空格
-            pyautogui.hotkey('win', 'space')
-        while re.search('英语\(', self.input_indicator.Name):
-            pass # 等待切换完成
+        success = change_language(lang="ZH")
+        while not success:
+            success = change_language(lang="ZH")
+        print(self.input_indicator.Name)
 
         # 切换到中文模式
         if re.search('英语模式', self.input_indicator.Name):
             # shift
-            pyautogui.hotkey('shift')
+            press_shift()
+            time.sleep(self.ui_respond_time)
         while re.search('英语模式', self.input_indicator.Name):
             pass # 等待切换完成
     
 
     def switch_to_english(self, wait_time=0) -> None:
         time.sleep(wait_time)
-
-        self.find_input_indicator()
-
         # 切换到英文键盘
-        if re.search('中文\(', self.input_indicator.Name):
-            # Windows + 空格
-            pyautogui.hotkey('win', 'space')
-        while re.search('中文\(', self.input_indicator.Name):
-            pass # 等待切换完成
+        success = change_language(lang="EN")
+        while not success:
+            success = change_language(lang="EN")
     
 
     def auto_pinyin_input(self, characters: str, wait_time=0, debug_output=False) -> None:
@@ -181,8 +208,8 @@ class AutoPinyin(object):
         for item in group:
             if item['type'] == '汉字':
                 if self.input_mode() != '中':
-                    time.sleep(self.ui_respond_time)
                     self.switch_to_chinese()
+                    time.sleep(self.ui_respond_time)
                 str = item['string']
                 # Split str into substrings of length self.split_length
                 substrings = [str[i:i+self.split_length] for i in range(0, len(str), self.split_length)]
@@ -203,6 +230,9 @@ class AutoPinyin(object):
                     self.switch_to_english()
                     time.sleep(self.ui_respond_time)
                 pyautogui.typewrite(item['string'])
+            
+            elif item['type'] == '换行':
+                pyautogui.hotkey('ctrl', 'enter')
             
             else:
                 pyperclip.copy(item['string'])
