@@ -1,8 +1,8 @@
 from itertools import groupby
 
 
-supported_cn_punctuation = "，。！？【】（）；：“”‘’《》"
-en_punctuation = ",.!?[]();:\"\"''<>"
+supported_cn_punctuation = "，。！？【】（）；：“”‘’《》、"
+en_punctuation = ",.!?[]();:\"\"''<>\\"
 
 table = str.maketrans(supported_cn_punctuation, en_punctuation)
 

@@ -1,5 +1,6 @@
 import uiautomation as auto
 import pyautogui
+import pyperclip
 import pinyin
 import unicodedata
 import time
@@ -63,6 +64,16 @@ class AutoPinyin(object):
 
         if self.input_indicator is None:
             raise InputIndicatorNotFoundError('没有找到托盘输入指示器')
+    
+
+    def input_mode(self) -> str:
+        self.find_input_indicator()
+        if re.search('英语\(', self.input_indicator.Name):
+            return '英'
+        elif re.search('英语模式', self.input_indicator.Name):
+            return '英'
+        else:
+            return '中'
 
 
     def switch_to_chinese(self, wait_time=0) -> None:
@@ -90,18 +101,11 @@ class AutoPinyin(object):
 
         self.find_input_indicator()
 
-        # 切换到微软拼音
-        if re.search('英语\(', self.input_indicator.Name):
+        # 切换到英文键盘
+        if re.search('中文\(', self.input_indicator.Name):
             # Windows + 空格
             pyautogui.hotkey('win', 'space')
-        while re.search('英语\(', self.input_indicator.Name):
-            pass # 等待切换完成
-
-        # 切换到英文模式
-        if re.search('中文模式', self.input_indicator.Name):
-            # shift
-            pyautogui.hotkey('shift')
-        while re.search('中文模式', self.input_indicator.Name):
+        while re.search('中文\(', self.input_indicator.Name):
             pass # 等待切换完成
     
 
@@ -110,17 +114,9 @@ class AutoPinyin(object):
         time.sleep(wait_time)
 
         self.switch_to_chinese()
-        time.sleep(self.ui_respond_time)
-
-        if len(characters) > 10:
-            raise ValueError('输入字符数不能超过10个')
-        
-        if any(ord(c) < 128 or unicodedata.category(c) == 'Po' for c in characters):
-            raise ValueError('输入字符不能包含ASCII字符或中文标点')
 
         characters_pinyin = pinyin.get(characters, format="strip")
         pyautogui.typewrite(characters_pinyin, interval=self.type_interval)
-        time.sleep(self.ui_respond_time)
 
         if self.candidate_panel is None:
             input_experience = auto.WindowControl(searchDepth=2, Name='Windows 输入体验')
@@ -137,6 +133,8 @@ class AutoPinyin(object):
 
         if debug_output:
             print(f'after input, candidates: {[candidate.Name for candidate in candidates]}')
+
+        print('type input complete')
 
         while remaining_characters != '':
 
@@ -158,40 +156,55 @@ class AutoPinyin(object):
                             print(f'hit candidate #{candidate_num}: {candidate.Name}, remaining characters: {remaining_characters}')
                             print(f'candidates: {[candidate.Name for candidate in candidates]}')
                         pyautogui.press(str(candidate_num))
-                        time.sleep(self.ui_respond_time)
+                        # time.sleep(self.ui_respond_time)
                         break
                 
                 if not hit:
                     if self.next_page_button.IsEnabled:
                         pyautogui.press(']')
-                        time.sleep(self.ui_respond_time)
+                        # time.sleep(self.ui_respond_time)
                     else:
                         while self.previous_page_button.IsEnabled:
                             pyautogui.press('[')
+        
+        print('candidate selection complete')
 
 
     def auto_input(self, characters: str, wait_time=0, debug_output=False) -> None:
         """自动输入（任意字符），输入完成后自动按下候选项数字键"""
         time.sleep(wait_time)
 
+        print('begin splitting')
         group = split_string(characters)
+        print('splitting complete')
 
         for item in group:
             if item['type'] == '汉字':
-                self.switch_to_chinese()
+                if self.input_mode() != '中':
+                    time.sleep(self.ui_respond_time)
+                    self.switch_to_chinese()
                 str = item['string']
                 # Split str into substrings of length self.split_length
                 substrings = [str[i:i+self.split_length] for i in range(0, len(str), self.split_length)]
+                print('substrings generated')
                 for substring in substrings:
                     self.auto_pinyin_input(substring, debug_output=debug_output)
             
             elif item['type'] == '中文标点':
-                self.switch_to_chinese()
+                if self.input_mode() != '中':
+                    time.sleep(self.ui_respond_time)
+                    self.switch_to_chinese()
                 str = item['string']
                 str = chinese_punctuation_translate(str)
                 pyautogui.typewrite(str)
             
-            else:
-                self.switch_to_english()
+            elif item['type'] == 'ASCII':
+                if self.input_mode() != '英':
+                    self.switch_to_english()
+                    time.sleep(self.ui_respond_time)
                 pyautogui.typewrite(item['string'])
+            
+            else:
+                pyperclip.copy(item['string'])
+                pyautogui.hotkey('ctrl', 'v')
         
