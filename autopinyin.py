@@ -105,7 +105,7 @@ class AutoPinyin(object):
             pass # 等待切换完成
     
 
-    def auto_pinyin_input(self, characters: str, wait_time=0) -> None:
+    def auto_pinyin_input(self, characters: str, wait_time=0, debug_output=False) -> None:
         """自动输入（只能是汉字），输入完成后自动按下候选项数字键"""
         time.sleep(wait_time)
 
@@ -135,7 +135,8 @@ class AutoPinyin(object):
         candidate_num = 0
         remaining_characters = characters
 
-        print(f'after input, candidates: {[candidate.Name for candidate in candidates]}')
+        if debug_output:
+            print(f'after input, candidates: {[candidate.Name for candidate in candidates]}')
 
         while remaining_characters != '':
 
@@ -153,8 +154,9 @@ class AutoPinyin(object):
                     if remaining_characters.startswith(candidate.Name):
                         hit = True
                         remaining_characters = remaining_characters[len(candidate.Name):]
-                        print(f'hit candidate #{candidate_num}: {candidate.Name}, remaining characters: {remaining_characters}')
-                        print(f'candidates: {[candidate.Name for candidate in candidates]}')
+                        if debug_output:
+                            print(f'hit candidate #{candidate_num}: {candidate.Name}, remaining characters: {remaining_characters}')
+                            print(f'candidates: {[candidate.Name for candidate in candidates]}')
                         pyautogui.press(str(candidate_num))
                         time.sleep(self.ui_respond_time)
                         break
@@ -168,7 +170,7 @@ class AutoPinyin(object):
                             pyautogui.press('[')
 
 
-    def auto_input(self, characters: str, wait_time=0) -> None:
+    def auto_input(self, characters: str, wait_time=0, debug_output=False) -> None:
         """自动输入（任意字符），输入完成后自动按下候选项数字键"""
         time.sleep(wait_time)
 
@@ -180,9 +182,8 @@ class AutoPinyin(object):
                 str = item['string']
                 # Split str into substrings of length self.split_length
                 substrings = [str[i:i+self.split_length] for i in range(0, len(str), self.split_length)]
-                print(f'substrings: {substrings}')
                 for substring in substrings:
-                    self.auto_pinyin_input(substring)
+                    self.auto_pinyin_input(substring, debug_output=debug_output)
             
             elif item['type'] == '中文标点':
                 self.switch_to_chinese()
