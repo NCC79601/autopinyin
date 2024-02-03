@@ -1,7 +1,7 @@
 import uiautomation as auto
 import pyautogui
 import pyperclip
-import pinyin
+from pypinyin import lazy_pinyin
 import platform
 import unicodedata
 import time
@@ -175,7 +175,8 @@ class AutoPinyin(object):
 
         self.switch_to_chinese()
 
-        characters_pinyin = pinyin.get(characters, format="strip")
+        # characters_pinyin = pinyin.get(characters, format="strip")
+        characters_pinyin = ''.join(lazy_pinyin(characters))
         pyautogui.typewrite(characters_pinyin, interval=self.type_interval)
         time.sleep(self.ui_respond_time)
 
@@ -214,6 +215,11 @@ class AutoPinyin(object):
                     if self.is_windows11:
                         if candidate.ControlType != auto.ControlType.ListItemControl:
                             continue
+                    if candidates == None:
+                        print('candidates is None!')
+                        pyautogui.press('space')
+                        time.sleep(self.ui_respond_time)
+                        return
                     # else:
                     #     if not re.search('CandidateList.CandidateButton', candidate.AutomationId):
                     #         continue
