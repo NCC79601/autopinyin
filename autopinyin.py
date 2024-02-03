@@ -2,6 +2,7 @@ import uiautomation as auto
 import pyautogui
 import pyperclip
 import pinyin
+import platform
 import unicodedata
 import time
 import re
@@ -20,6 +21,11 @@ class TaskbarNotFoundError(Exception):
 class CandidatePanelNotFoundError(Exception):
     """Raised when the candidate panel is not found"""
     pass
+
+
+def is_windows11():
+    os_info = platform.platform()
+    return 'Windows-11' in os_info
 
 
 import win32api
@@ -71,6 +77,8 @@ class AutoPinyin(object):
         self.type_interval = type_interval
 
         self.split_length = split_length
+
+        self.is_windows11 = is_windows11()
     
 
     def find_input_indicator(self) -> None:
@@ -80,20 +88,35 @@ class AutoPinyin(object):
 
         root = auto.GetRootControl()
         taskbar = None
+
         for control in root.GetChildren():
             if control.Name == '任务栏':
                 taskbar = control
                 break
         if taskbar is None:
             raise TaskbarNotFoundError('没有找到任务栏')
-
-        for child_depth2 in taskbar.GetChildren():
-            for child_depth3 in child_depth2.GetChildren():
-                for child_depth4 in child_depth3.GetChildren():
-                    match = re.search('托盘输入指示器', child_depth4.Name)
+        
+        if self.is_windows11:
+            # for Windows 11:
+            for child_depth2 in taskbar.GetChildren():
+                for child_depth3 in child_depth2.GetChildren():
+                    for child_depth4 in child_depth3.GetChildren():
+                        match = re.search('托盘输入指示器', child_depth4.Name)
+                        if match:
+                            self.input_indicator = child_depth4
+                            break
+        else:
+            # for Windows 10:
+            for child_depth2 in taskbar.GetChildren():
+                for child_depth3 in child_depth2.GetChildren():
+                    match = re.search('任务栏输入指示', child_depth3.Name)
                     if match:
-                        self.input_indicator = child_depth4
-                        break
+                        self.input_indicator_parent = child_depth3
+                        for child_depth4 in child_depth3.GetChildren():
+                            match = re.search('任务栏输入指示', child_depth4.Name)
+                            if match:
+                                self.input_indicator = child_depth4
+                                break
 
         if self.input_indicator is None:
             raise InputIndicatorNotFoundError('没有找到托盘输入指示器')
@@ -121,11 +144,21 @@ class AutoPinyin(object):
         # print(self.input_indicator.Name)
 
         # 切换到中文模式
-        if re.search('英语模式', self.input_indicator.Name):
-            # shift
-            press_shift()
-        while re.search('英语模式', self.input_indicator.Name):
-            pass # 等待切换完成
+        if self.is_windows11:
+            if re.search('英语模式', self.input_indicator.Name):
+                # shift
+                press_shift()
+            while re.search('英语模式', self.input_indicator.Name):
+                pass # 等待切换完成
+        else:
+            # for Windows 10:
+            for child_depth4 in self.input_indicator_parent.GetChildren():
+                if re.search('模式图标', child_depth4.Name) and re.search('英语', child_depth4.Name):
+                    # shift
+                    press_shift()
+                while re.search('模式图标', child_depth4.Name) and re.search('英语', child_depth4.Name):
+                    pass
+                break
     
 
     def switch_to_english(self, wait_time=0) -> None:
@@ -147,11 +180,15 @@ class AutoPinyin(object):
         time.sleep(self.ui_respond_time)
 
         if self.candidate_panel is None:
-            input_experience = auto.WindowControl(searchDepth=2, Name='Windows 输入体验')
-            self.candidate_ui = input_experience.MenuControl(searchDepth=1, Name='Microsoft 候选项 UI')
-            self.candidate_panel = self.candidate_ui.ListControl(searchDepth=1, Name='候选项面板')
-            self.previous_page_button = self.candidate_panel.ButtonControl(searchDepth=1, Name='上一页')
-            self.next_page_button = self.candidate_panel.ButtonControl(searchDepth=1, Name='下一页')
+            if self.is_windows11:
+                input_experience = auto.WindowControl(searchDepth=2, Name='Windows 输入体验')
+                self.candidate_ui = input_experience.MenuControl(searchDepth=1, Name='Microsoft 候选项 UI')
+                self.candidate_panel = self.candidate_ui.ListControl(searchDepth=1, Name='候选项面板')
+                self.previous_page_button = self.candidate_panel.ButtonControl(searchDepth=1, Name='上一页')
+                self.next_page_button = self.candidate_panel.ButtonControl(searchDepth=1, Name='下一页')
+            else:
+                # for Windows 10:
+                self.candidate_panel = auto.GroupControl(searchDepth=4, Name='转换候选项列表')
         if self.candidate_panel is None:
             raise CandidatePanelNotFoundError('没有找到候选项面板')
         
@@ -166,15 +203,20 @@ class AutoPinyin(object):
 
             hit = False
             fail_time = 0
-
-            while self.previous_page_button.IsEnabled:
-                pass
+            
+            if self.is_windows11:
+                while self.previous_page_button.IsEnabled:
+                    pass
 
             while not hit:
                 candidate_num = 0
                 for candidate in candidates:
-                    if candidate.ControlType != auto.ControlType.ListItemControl:
-                        continue
+                    if self.is_windows11:
+                        if candidate.ControlType != auto.ControlType.ListItemControl:
+                            continue
+                    # else:
+                    #     if not re.search('CandidateList.CandidateButton', candidate.AutomationId):
+                    #         continue
                     candidate_num += 1
                     if remaining_characters.startswith(candidate.Name):
                         hit = True
@@ -190,12 +232,16 @@ class AutoPinyin(object):
                     if fail_time >= 20:
                         print('fail to hit candidate, ignore')
                         break
-                    if self.next_page_button.IsEnabled:
+                    if self.is_windows11:
+                        if self.next_page_button.IsEnabled:
+                            pyautogui.press('pagedown')
+                            time.sleep(self.ui_respond_time)
+                        else:
+                            while self.previous_page_button.IsEnabled:
+                                pyautogui.press('pageup')
+                    else:
                         pyautogui.press('pagedown')
                         time.sleep(self.ui_respond_time)
-                    else:
-                        while self.previous_page_button.IsEnabled:
-                            pyautogui.press('pageup')
 
 
     def auto_input(self, characters: str, wait_time=0, debug_output=True) -> None:
