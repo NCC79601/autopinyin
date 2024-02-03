@@ -231,7 +231,9 @@ class AutoPinyin(object):
                     fail_time += 1
                     if fail_time >= 20:
                         print('fail to hit candidate, ignore')
-                        break
+                        pyautogui.press('space')
+                        time.sleep(self.ui_respond_time)
+                        return
                     if self.is_windows11:
                         if self.next_page_button.IsEnabled:
                             pyautogui.press('pagedown')
