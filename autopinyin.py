@@ -224,11 +224,21 @@ class AutoPinyin(object):
                     #     if not re.search('CandidateList.CandidateButton', candidate.AutomationId):
                     #         continue
                     candidate_num += 1
-                    if remaining_characters.startswith(candidate.Name):
+
+                    while True:
+                        try:
+                            candidate_name = candidate.Name
+                            break
+                        except Exception as e:
+                            print(f"An error occurred!\n{e}")
+                            time.sleep(self.ui_respond_time)
+                            continue
+                    
+                    if remaining_characters.startswith(candidate_name):
                         hit = True
-                        remaining_characters = remaining_characters[len(candidate.Name):]
+                        remaining_characters = remaining_characters[len(candidate_name):]
                         if debug_output:
-                            print(f'hit candidate #{candidate_num}: {candidate.Name}, remaining characters: {remaining_characters}')
+                            print(f'hit candidate #{candidate_num}: {candidate_name}, remaining characters: {remaining_characters}')
                         pyautogui.press(str(candidate_num))
                         # time.sleep(self.ui_respond_time)
                         break
