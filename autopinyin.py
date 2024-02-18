@@ -230,7 +230,7 @@ class AutoPinyin(object):
                             candidate_name = candidate.Name
                             break
                         except Exception as e:
-                            print(f"An error occurred!\n{e}")
+                            print(f"An error occurred:\n{e}")
                             time.sleep(self.ui_respond_time)
                             continue
                     
